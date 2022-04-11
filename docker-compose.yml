@@ -1,0 +1,70 @@
+version: "3.7"
+services:
+    rabbitmq:
+        image: "rabbitmq:3-management"
+        hostname: "rabbit"
+        ports:
+            - "15672:15672"
+            - "5672:5672"
+        labels:
+            NAME: "rabbitmq"
+        volumes:
+            - ./rabbitmq-isolated.conf:/etc/rabbitmq/rabbitmq.config
+    app:
+        build:
+            args:
+                user: sammy
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile.dev
+        working_dir: /var/www/
+        environment:
+            - COMPOSER_MEMORY_LIMIT=-1
+        depends_on:
+            - db
+        volumes:
+            - ./:/var/www
+        networks:
+            - lahmi
+
+    db:
+        image: mysql:8.0.1
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        volumes:
+            - dbdata:/var/lib/mysql
+            - ./docker-compose/mysql/my.cnf:/etc/mysql/my.cnf
+            - ./docker-compose/mysql/init:/docker-entrypoint-initdb.d
+            - ./mysql-files:/var/lib/mysql-files
+
+        ports:
+            - 3307:3306
+        networks:
+            - lahmi
+
+    nginx:
+        image: nginx:alpine
+        ports:
+            - 8010:80
+        depends_on:
+            - db
+            - app
+        volumes:
+            - ./:/var/www
+            - ./docker-compose/nginx:/etc/nginx/conf.d/
+        networks:
+            - lahmi
+
+networks:
+    lahmi:
+        driver: bridge
+
+volumes:
+    dbdata:
+        driver: local
+
